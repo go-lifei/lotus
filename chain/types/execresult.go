@@ -24,6 +24,8 @@ type MessageTrace struct {
 	Method      abi.MethodNum
 	Params      []byte
 	ParamsCodec uint64
+	GasLimit    uint64
+	ReadOnly    bool
 }
 
 type ReturnTrace struct {

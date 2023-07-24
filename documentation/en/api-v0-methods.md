@@ -4873,7 +4873,9 @@ Response:
       "Value": "0",
       "Method": 1,
       "Params": "Ynl0ZSBhcnJheQ==",
-      "ParamsCodec": 42
+      "ParamsCodec": 42,
+      "GasLimit": 42,
+      "ReadOnly": true
     },
     "MsgRct": {
       "ExitCode": 0,
@@ -4897,7 +4899,9 @@ Response:
           "Value": "0",
           "Method": 1,
           "Params": "Ynl0ZSBhcnJheQ==",
-          "ParamsCodec": 42
+          "ParamsCodec": 42,
+          "GasLimit": 42,
+          "ReadOnly": true
         },
         "MsgRct": {
           "ExitCode": 0,
@@ -5103,7 +5107,9 @@ Response:
           "Value": "0",
           "Method": 1,
           "Params": "Ynl0ZSBhcnJheQ==",
-          "ParamsCodec": 42
+          "ParamsCodec": 42,
+          "GasLimit": 42,
+          "ReadOnly": true
         },
         "MsgRct": {
           "ExitCode": 0,
@@ -5127,7 +5133,9 @@ Response:
               "Value": "0",
               "Method": 1,
               "Params": "Ynl0ZSBhcnJheQ==",
-              "ParamsCodec": 42
+              "ParamsCodec": 42,
+              "GasLimit": 42,
+              "ReadOnly": true
             },
             "MsgRct": {
               "ExitCode": 0,
@@ -6491,7 +6499,9 @@ Response:
       "Value": "0",
       "Method": 1,
       "Params": "Ynl0ZSBhcnJheQ==",
-      "ParamsCodec": 42
+      "ParamsCodec": 42,
+      "GasLimit": 42,
+      "ReadOnly": true
     },
     "MsgRct": {
       "ExitCode": 0,
@@ -6515,7 +6525,9 @@ Response:
           "Value": "0",
           "Method": 1,
           "Params": "Ynl0ZSBhcnJheQ==",
-          "ParamsCodec": 42
+          "ParamsCodec": 42,
+          "GasLimit": 42,
+          "ReadOnly": true
         },
         "MsgRct": {
           "ExitCode": 0,

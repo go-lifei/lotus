@@ -238,3 +238,31 @@ func TestChainExportImportFull(t *testing.T) {
 		}
 	}
 }
+
+func TestExpandTipsetPurgesDuplicates(t *testing.T) {
+	cg, err := gen.NewGenerator()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var last *types.TipSet
+	for i := 0; i < 10; i++ {
+		ts, err := cg.NextTipSet()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		last = ts.TipSet.TipSet()
+	}
+
+	require.NotEmpty(t, last.Blocks())
+	oldBlk := last.Blocks()[0]
+	dupBlk := *oldBlk
+	dupBlk.Timestamp = dupBlk.Timestamp + 1
+
+	expandedTipset, err := cg.ChainStore().ExpandTipset(context.TODO(), &dupBlk)
+	require.NoError(t, err)
+
+	require.False(t, expandedTipset.Contains(oldBlk.Cid()))
+	require.False(t, expandedTipset.Contains(dupBlk.Cid()))
+}

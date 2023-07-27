@@ -480,6 +480,12 @@ func (cg *ChainGen) NextTipSetFromMinersWithMessagesAndNulls(base *types.TipSet,
 		return nil, err
 	}
 
+	for _, blk := range fts.TipSet().Blocks() {
+		if err := cg.cs.AddToTipSetTracker(context.TODO(), blk); err != nil {
+			return nil, xerrors.Errorf("failed to add to tipset tracker: %w", err)
+		}
+	}
+
 	cg.CurTipset = fts
 
 	return fts, nil

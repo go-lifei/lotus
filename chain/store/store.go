@@ -382,7 +382,7 @@ func (cs *ChainStore) PutTipSet(ctx context.Context, ts *types.TipSet) error {
 		return xerrors.Errorf("failed to persist tipset: %w", err)
 	}
 
-	expanded, err := cs.expandTipset(ctx, ts.Blocks()[0])
+	expanded, err := cs.ExpandTipset(ctx, ts.Blocks()[0])
 	if err != nil {
 		return xerrors.Errorf("errored while expanding tipset: %w", err)
 	}
@@ -1027,7 +1027,7 @@ func (cs *ChainStore) persistBlockHeaders(ctx context.Context, b ...*types.Block
 	return err
 }
 
-func (cs *ChainStore) expandTipset(ctx context.Context, b *types.BlockHeader) (*types.TipSet, error) {
+func (cs *ChainStore) ExpandTipset(ctx context.Context, b *types.BlockHeader) (*types.TipSet, error) {
 	// Hold lock for the whole function for now, if it becomes a problem we can
 	// fix pretty easily
 	cs.tstLk.Lock()
@@ -1052,7 +1052,15 @@ func (cs *ChainStore) expandTipset(ctx context.Context, b *types.BlockHeader) (*
 		}
 
 		if cid, found := inclMiners[h.Miner]; found {
-			log.Warnf("Have multiple blocks from miner %s at height %d in our tipset cache %s-%s", h.Miner, h.Height, h.Cid(), cid)
+			log.Warnf("Have multiple blocks from miner %s at height %d in our tipset cache %s-%s, purging them all", h.Miner, h.Height, h.Cid(), cid)
+			newAll := make([]*types.BlockHeader, 0, len(all))
+			for _, blk := range all {
+				if blk.Miner != h.Miner {
+					newAll = append(newAll, blk)
+				}
+			}
+
+			all = newAll
 			continue
 		}
 

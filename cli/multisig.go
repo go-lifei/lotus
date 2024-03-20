@@ -2,10 +2,12 @@ package cli
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	builtintypes "github.com/filecoin-project/go-state-types/builtin"
+	"github.com/filecoin-project/lotus/chain/types/ethtypes"
+	cliutil "github.com/filecoin-project/lotus/cli/util"
 	"reflect"
 	"sort"
 	"strconv"
@@ -20,6 +22,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
+	builtintypes "github.com/filecoin-project/go-state-types/builtin"
 	init2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/init"
 	msig2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/multisig"
 
@@ -61,6 +64,7 @@ var multisigCmd = &cli.Command{
 		msigLockCancelCmd,
 		msigVestedCmd,
 		msigProposeThresholdCmd,
+		msigProposeTransferCmd,
 	},
 }
 
@@ -1843,6 +1847,123 @@ var msigProposeThresholdCmd = &cli.Command{
 
 		if wait.Receipt.ExitCode.IsError() {
 			return fmt.Errorf("change threshold proposal returned exit %d", wait.Receipt.ExitCode)
+		}
+
+		return nil
+	},
+}
+
+var msigProposeTransferCmd = &cli.Command{
+	Name:      "propose-transfer",
+	Usage:     "Propose to transfer frc20 tokens from a multisig address",
+	ArgsUsage: "[multisigAddress tokenAddress recipientAddress transferAmount]",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "from",
+			Usage: "account to send the approve message from",
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		if cctx.NArg() != 4 {
+			return IncorrectNumArgs(cctx)
+		}
+
+		srv, err := GetFullNodeServices(cctx)
+		if err != nil {
+			return err
+		}
+		defer srv.Close() //nolint:errcheck
+
+		api := srv.FullNodeAPI()
+		ctx := ReqContext(cctx)
+
+		msig, err := address.NewFromString(cctx.Args().Get(0))
+		if err != nil {
+			return err
+		}
+
+		tokenAddress, err := address.NewFromString(cctx.Args().Get(1))
+		if err != nil {
+			tokenETHAddress, perr := ethtypes.ParseEthAddress(cctx.Args().Get(1))
+			if perr != nil {
+				return perr
+			}
+			tokenAddress, err = tokenETHAddress.ToFilecoinAddress()
+			if err != nil {
+				return err
+			}
+		}
+
+		recipientAddress, err := cliutil.ParseAddress(ctx, cctx.Args().Get(2), api)
+		if err != nil {
+			return err
+		}
+
+		tokenAmount, err := strconv.ParseUint(cctx.Args().Get(3), 10, 64)
+		if err != nil {
+			return err
+		}
+		var tokenAmountBytes = make([]byte, 8)
+		binary.BigEndian.PutUint64(tokenAmountBytes, tokenAmount)
+		method, err := hex.DecodeString("a9059cbb")
+		if err != nil {
+			return err
+		}
+		var data bytes.Buffer
+		data.Write(method)                                                                                            //4bytes transfer method 0xa9059cbb
+		data.Write(bytes.Join([][]byte{bytes.Repeat([]byte{0}, 32-len(recipientAddress)), recipientAddress[:]}, nil)) //32bytes recipient
+		data.Write(bytes.Join([][]byte{bytes.Repeat([]byte{0}, 32-len(tokenAmountBytes)), tokenAmountBytes[:]}, nil)) //32bytes transfer amount
+
+		var buffer bytes.Buffer
+		if err := cbg.WriteByteArray(&buffer, data.Bytes()); err != nil {
+			return xerrors.Errorf("failed to encode evm params as cbor: %w", err)
+		}
+		params := buffer.Bytes()
+		var from address.Address
+		if cctx.IsSet("from") {
+			f, err := address.NewFromString(cctx.String("from"))
+			if err != nil {
+				return err
+			}
+			from = f
+		} else {
+			defaddr, err := api.WalletDefaultAddress(ctx)
+			if err != nil {
+				return err
+			}
+			from = defaddr
+		}
+
+		act, err := api.StateGetActor(ctx, msig, types.EmptyTSK)
+		if err != nil {
+			return fmt.Errorf("failed to look up multisig %s: %w", msig, err)
+		}
+
+		if !builtin.IsMultisigActor(act.Code) {
+			return fmt.Errorf("actor %s is not a multisig actor", msig)
+		}
+
+		proto, err := api.MsigPropose(ctx, msig, tokenAddress, types.NewInt(0), from, uint64(builtintypes.MethodsEVM.InvokeContract), params)
+		if err != nil {
+			return err
+		}
+
+		sm, err := InteractiveSend(ctx, cctx, srv, proto)
+		if err != nil {
+			return err
+		}
+
+		msgCid := sm.Cid()
+
+		fmt.Println("sent swap proposal in message: ", msgCid)
+
+		wait, err := api.StateWaitMsg(ctx, msgCid, uint64(cctx.Int("confidence")), build.Finality, true)
+		if err != nil {
+			return err
+		}
+
+		if wait.Receipt.ExitCode.IsError() {
+			return fmt.Errorf("swap proposal returned exit %d", wait.Receipt.ExitCode)
 		}
 
 		return nil
